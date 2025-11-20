@@ -1,8 +1,10 @@
 "use client"
-
 import { useRef, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Download } from "lucide-react"
+import { useWindowSize } from "react-use"
+import Confetti from "react-confetti"
+import Image from "next/image"
 
 interface ResultsScreenProps {
   yesAnswers: number[]
@@ -14,7 +16,15 @@ interface ResultsScreenProps {
 export function ResultsScreen({ yesAnswers, questions, totalQuestions, onRestart }: ResultsScreenProps) {
   const resultsRef = useRef<HTMLDivElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [confetti, setConfetti] = useState<Array<{ id: number; left: number; delay: number; duration: number }>>([])
+
+  const { width, height } = useWindowSize()
+
+  const [confetti, setConfetti] = useState<
+    Array<{ id: number; left: number; delay: number; duration: number }>
+  >([])
+
+  const [hideEffects, setHideEffects] = useState(false) // mobile fix
+
   const yesCount = yesAnswers.length
   const percentage = Math.round((yesCount / totalQuestions) * 100)
 
@@ -47,17 +57,22 @@ export function ResultsScreen({ yesAnswers, questions, totalQuestions, onRestart
         title: "Sweet!",
         description: "You've got that spark! There's definitely something special here! 💫",
       }
-    } else {
-      return {
-        emoji: "😊",
-        title: "Interesting!",
-        description: "Every love story is unique! Who knows what the future holds! ✨",
-      }
+    }
+
+    return {
+      emoji: "😊",
+      title: "Interesting!",
+      description: "Every love story is unique! Who knows what the future holds! ✨",
     }
   }
 
+  // SCREENSHOT FIXED VERSION
   const handleCapture = async () => {
     if (typeof window === "undefined") return
+
+    // Remove confetti + animations for screenshot
+    setHideEffects(true)
+    await new Promise((res) => setTimeout(res, 150))
 
     const { default: html2canvas } = await import("html2canvas")
 
@@ -65,20 +80,24 @@ export function ResultsScreen({ yesAnswers, questions, totalQuestions, onRestart
       try {
         const canvas = await html2canvas(resultsRef.current, {
           backgroundColor: "#ffffff",
-          scale: 2,
-          logging: false,
+          scale: window.devicePixelRatio < 1.5 ? 2 : 1, // mobile fix
           useCORS: true,
           allowTaint: true,
           foreignObjectRendering: true,
+          scrollX: 0,
+          scrollY: -window.scrollY, // iPhone fix
         })
+
         const link = document.createElement("a")
         link.href = canvas.toDataURL("image/png")
-        link.download = `quiz-results-${new Date().getTime()}.png`
+        link.download = `quiz-results-${Date.now()}.png`
         link.click()
       } catch (error) {
-        console.error("Failed to capture screenshot:", error)
+        console.error("Screenshot error:", error)
       }
     }
+
+    setHideEffects(false) // show animations again
   }
 
   const message = getMessage()
@@ -103,25 +122,22 @@ export function ResultsScreen({ yesAnswers, questions, totalQuestions, onRestart
       ref={containerRef}
       className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-rose-100 via-pink-100 to-purple-100 relative overflow-hidden"
     >
-      {confettiElements}
+      {!hideEffects && <Confetti width={width} height={height} />}
+      {!hideEffects && confettiElements}
 
       <div className="w-full max-w-md mx-auto">
-        <div ref={resultsRef} className="bg-white rounded-3xl shadow-2xl p-8 text-center space-y-6">
-          {/* Main emoji with bounce animation */}
-          <div className="text-6xl sm:text-8xl animate-bounce">{message.emoji}</div>
-
-          <div className="flex justify-center items-center gap-2 sm:gap-4 py-4">
-            <div className="text-3xl sm:text-5xl animate-pulse">👨</div>
-            <div className="text-lg sm:text-2xl">💕</div>
-            <div className="text-3xl sm:text-5xl animate-pulse">👩</div>
+        <div
+          ref={resultsRef}
+          className="bg-white rounded-3xl shadow-2xl p-2 text-center space-y-6 relative z-10"
+        >
+          <div className="flex justify-center items-center">
+            <Image src={"/img/eni1.png"} alt="image" width={100} height={100} />
           </div>
 
-          {/* Title */}
           <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold bg-gradient-to-r from-rose-600 to-pink-600 bg-clip-text text-transparent">
             {message.title}
           </h1>
 
-          {/* Results */}
           <div className="bg-gradient-to-r from-rose-100 to-pink-100 rounded-2xl p-4 sm:p-6 space-y-3">
             <p className="text-xs sm:text-sm text-gray-600 font-medium">Your Love Score:</p>
             <div className="text-4xl sm:text-5xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-rose-500 to-pink-500">
@@ -136,8 +152,9 @@ export function ResultsScreen({ yesAnswers, questions, totalQuestions, onRestart
             <p className="text-sm sm:text-lg font-bold text-rose-600">{percentage}% Compatible</p>
           </div>
 
-          {/* Message */}
-          <p className="text-sm sm:text-xl text-gray-700 font-semibold leading-relaxed">{message.description}</p>
+          <p className="text-sm sm:text-xl text-gray-700 font-semibold leading-relaxed">
+            {message.description}
+          </p>
 
           {yesAnswers.length > 0 && (
             <div className="bg-gradient-to-r from-rose-50 to-pink-50 rounded-2xl p-3 sm:p-4 text-left space-y-2">
@@ -154,7 +171,6 @@ export function ResultsScreen({ yesAnswers, questions, totalQuestions, onRestart
           )}
         </div>
 
-        {/* Buttons */}
         <div className="flex gap-2 sm:gap-3 mt-6 flex-col sm:flex-row">
           <Button
             onClick={handleCapture}
@@ -173,7 +189,6 @@ export function ResultsScreen({ yesAnswers, questions, totalQuestions, onRestart
           </Button>
         </div>
 
-        {/* Fun footer message */}
         <div className="text-center mt-8 text-rose-600 text-xs sm:text-sm font-semibold">
           <p>Made with 💕 for Love</p>
         </div>
